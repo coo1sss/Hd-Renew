@@ -3,7 +3,7 @@ name: HidenCloud-Renew
 on:
   workflow_dispatch:
   schedule:
-    - cron: '10 8 * * *'
+    - cron: '18 5 * * *'
 
 jobs:
   run_hiden_renew:
@@ -20,7 +20,10 @@ jobs:
           path: private
 
       - name: 📂 移动脚本到工作目录
-        run: mv private/hiden_renew.py hiden_renew.py
+        run: |
+          mv private/hiden_renew.py hiden_renew.py
+          # 如果私库有续期记录文件，复制过来供脚本读取
+          cp private/last_renew.txt . 2>/dev/null || echo "首次运行，无记录文件"
 
       - name: 🐍 设置 Python
         uses: actions/setup-python@v4
@@ -64,6 +67,20 @@ jobs:
           TG_BOT: ${{ secrets.TG_BOT }}
         run: |
           xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" python hiden_renew.py
+
+      - name: 💾 保存续期记录到私库
+        if: always()
+        run: |
+          # 如果脚本生成了新的记录文件，写回私库
+          if [ -f last_renew.txt ]; then
+            cp last_renew.txt private/last_renew.txt
+            cd private
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git config user.name "github-actions[bot]"
+            git add last_renew.txt
+            git commit -m "Update renewal state [skip ci]" || echo "无变更"
+            git push
+          fi
 
       - name: 📸 上传截图
         if: always()
